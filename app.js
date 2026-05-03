@@ -48,7 +48,7 @@ Rules:
 - Keep the energy high and the pace fast.`
 };
 
-const DEFAULT_API_KEY = 'AIzaSyBC5aPBgTAFDdtQ-e9d-n-taOzv8ikGY7k';
+const DEFAULT_API_KEY = ''; // KHÔNG BAO GIỜ ĐỂ API KEY Ở ĐÂY NẾU CODE PUBLIC
 
 // ===== GOOGLE SHEET AUTH CONFIG =====
 // Bạn (Kate) cần:
@@ -373,8 +373,7 @@ async function sendToGemini() {
   const loadingId = addMessage('ai', '💭 Đang suy nghĩ...', true);
 
   try {
-    // Sử dụng gemini-1.5-flash thay vì 2.0 để tránh lỗi Quota Limit = 0 ở bản Free
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
     
     const body = {
       contents: chatHistory,
