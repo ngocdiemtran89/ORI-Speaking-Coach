@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ORI Speaking Coach — Luyện Nói Với AI</title>
+  <meta name="description" content="Luyện nói tiếng Anh phản xạ với AI - ORI Academy">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-container">
+      <div class="login-glow"></div>
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="logo-pulse">
+            <i class="ri-mic-line"></i>
+          </div>
+          <h1>ORI Speaking Coach</h1>
+          <p>Luyện nói tiếng Anh phản xạ với AI</p>
+        </div>
+        <div class="login-form">
+          <div class="form-group">
+            <label for="loginName">Tên học viên</label>
+            <input type="text" id="loginName" placeholder="Nhập tên của bạn..." autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="loginPass">Mật khẩu</label>
+            <input type="password" id="loginPass" placeholder="Nhập mật khẩu...">
+          </div>
+          <div id="loginError" class="login-error"></div>
+          <button class="btn-login" onclick="handleLogin()">
+            <i class="ri-login-box-line"></i> Vào Luyện Tập
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="appScreen" class="screen">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-logo"><i class="ri-mic-line"></i></div>
+        <div>
+          <h2>ORI Speaking Coach</h2>
+          <span class="user-badge" id="userBadge">Học viên</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn-icon" id="btnSettings" onclick="toggleSettings()"><i class="ri-settings-3-line"></i></button>
+        <button class="btn-icon danger" onclick="handleLogout()"><i class="ri-logout-box-r-line"></i></button>
+      </div>
+    </header>
+
+    <!-- Settings Panel (Hidden by default) -->
+    <div id="settingsPanel" class="settings-panel" style="display:none;">
+      <div class="settings-inner">
+        <h3><i class="ri-key-2-line"></i> Cài đặt API Key</h3>
+        <div class="form-group">
+          <label>Gemini API Key</label>
+          <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
+        </div>
+        <button class="btn-primary small" onclick="saveApiKey()">Lưu Key</button>
+      </div>
+    </div>
+
+    <!-- MODE SELECTION -->
+    <div id="modeSelection" class="mode-selection">
+      <h2 class="section-title">Chọn chế độ luyện tập</h2>
+      <div class="mode-grid">
+
+        <div class="mode-card" onclick="startSession('free')">
+          <div class="mode-icon free"><i class="ri-chat-smile-3-line"></i></div>
+          <h3>Free Talk</h3>
+          <p>Nói chuyện tự do với AI về bất kỳ chủ đề nào</p>
+        </div>
+
+        <div class="mode-card" onclick="showTopics()">
+          <div class="mode-icon topic"><i class="ri-book-open-line"></i></div>
+          <h3>Topic Drill</h3>
+          <p>Chọn chủ đề cụ thể để luyện tập có mục tiêu</p>
+        </div>
+
+        <div class="mode-card" onclick="startSession('reflex')">
+          <div class="mode-icon reflex"><i class="ri-flashlight-line"></i></div>
+          <h3>Reflex Challenge</h3>
+          <p>AI hỏi nhanh — trả lời trong 10 giây</p>
+        </div>
+
+      </div>
+
+      <!-- Topic Picker (Hidden) -->
+      <div id="topicPicker" class="topic-picker" style="display:none;">
+        <h3>Chọn chủ đề</h3>
+        <div class="topic-grid" id="topicGrid"></div>
+      </div>
+    </div>
+
+    <!-- CONVERSATION VIEW -->
+    <div id="conversationView" class="conversation-view" style="display:none;">
+      <div class="conv-header">
+        <button class="btn-back" onclick="endSession()"><i class="ri-arrow-left-line"></i> Kết thúc</button>
+        <div class="conv-mode-label" id="convModeLabel">Free Talk</div>
+        <div class="conv-timer" id="convTimer" style="display:none;">
+          <i class="ri-timer-line"></i> <span id="timerText">10</span>s
+        </div>
+      </div>
+
+      <div class="chat-area" id="chatArea">
+        <!-- Messages rendered here -->
+      </div>
+
+      <!-- Feedback Panel (Slides up when AI gives correction) -->
+      <div class="feedback-panel" id="feedbackPanel" style="display:none;">
+        <div class="feedback-header">
+          <span><i class="ri-lightbulb-line"></i> Feedback</span>
+          <button class="btn-icon small" onclick="closeFeedback()"><i class="ri-close-line"></i></button>
+        </div>
+        <div class="feedback-body" id="feedbackBody"></div>
+      </div>
+
+      <!-- Mic Controls -->
+      <div class="mic-controls">
+        <div class="transcript-preview" id="transcriptPreview"></div>
+        <div class="mic-row">
+          <button class="btn-mic" id="btnMic" onmousedown="startListening()" onmouseup="stopListening()" ontouchstart="startListening()" ontouchend="stopListening()">
+            <i class="ri-mic-line"></i>
+          </button>
+          <span class="mic-hint" id="micHint">Giữ nút để nói</span>
+        </div>
+        <button class="btn-send-text" id="btnSendText" onclick="toggleTextInput()" title="Nhập bằng text">
+          <i class="ri-keyboard-line"></i>
+        </button>
+        <div class="text-input-row" id="textInputRow" style="display:none;">
+          <input type="text" id="textInput" placeholder="Hoặc gõ tin nhắn..." onkeydown="if(event.key==='Enter')sendTextMessage()">
+          <button class="btn-primary small" onclick="sendTextMessage()"><i class="ri-send-plane-fill"></i></button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
