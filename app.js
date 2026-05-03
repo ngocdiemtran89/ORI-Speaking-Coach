@@ -373,7 +373,8 @@ async function sendToGemini() {
   const loadingId = addMessage('ai', '💭 Đang suy nghĩ...', true);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    // Sử dụng gemini-1.5-flash thay vì 2.0 để tránh lỗi Quota Limit = 0 ở bản Free
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const body = {
       contents: chatHistory,
