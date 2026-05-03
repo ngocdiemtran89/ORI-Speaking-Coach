@@ -284,8 +284,8 @@ function initSpeechRecognition() {
 let audioUnlocked = false;
 function unlockAudio() {
   if (audioUnlocked) return;
-  const silent = new Audio('data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq');
-  silent.play().catch(()=>{});
+  currentAudio.src = 'data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+  currentAudio.play().catch(()=>{});
   if ('speechSynthesis' in window) {
     const utter = new SpeechSynthesisUtterance('');
     utter.volume = 0;
@@ -404,31 +404,38 @@ async function sendToAI() {
 }
 
 // ===== TTS =====
-let currentAudio = null;
+let currentAudio = new Audio();
 
 function speakText(text) {
   // Dừng audio cũ nếu đang phát
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
+  currentAudio.pause();
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   // Tách câu để lách giới hạn 200 ký tự của Google TTS
-  const chunks = text.match(/[^.?!]+[.?!]+|[^.?!]+$/g) || [text];
+  // Tách theo dấu chấm, chấm hỏi, chấm than, hoặc xuống dòng
+  const chunks = text.match(/[^.?!\\n]+[.?!\\n]+|[^.?!\\n]+$/g) || [text];
   let currentChunk = 0;
 
   function playNext() {
     if (currentChunk >= chunks.length) return;
-    const chunk = chunks[currentChunk].trim();
+    let chunk = chunks[currentChunk].trim();
     if (!chunk) {
       currentChunk++;
       playNext();
       return;
     }
 
-    const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=en&client=tw-ob`;
-    currentAudio = new Audio(url);
+    // Nếu chunk quá dài (> 150 ký tự), cắt bớt để không bị lỗi 400 Bad Request
+    if (chunk.length > 150) {
+      chunk = chunk.substring(0, 150);
+    }
+
+    // Phát hiện tiếng Việt
+    const isVietnamese = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(chunk);
+    const langCode = isVietnamese ? 'vi' : 'en';
+
+    const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${langCode}&client=tw-ob`;
+    currentAudio.src = url;
     currentAudio.playbackRate = 1.0;
     
     currentAudio.onended = () => {
@@ -437,28 +444,39 @@ function speakText(text) {
     };
     
     currentAudio.onerror = () => {
-      // Fallback nếu mạng lỗi: dùng giọng máy tính
-      fallbackTTS(chunks.slice(currentChunk).join(' '));
+      // Fallback nếu mạng lỗi
+      fallbackTTS(chunk, isVietnamese);
+      // Giả lập onended để chạy tiếp câu sau
+      setTimeout(() => {
+        currentChunk++;
+        playNext();
+      }, 2000);
     };
 
     currentAudio.play().catch(e => {
-      fallbackTTS(chunks.slice(currentChunk).join(' '));
+      fallbackTTS(chunk, isVietnamese);
+      setTimeout(() => {
+        currentChunk++;
+        playNext();
+      }, 2000);
     });
   }
 
-  // Pre-fetch iframe check if blocked by CORS?
   playNext();
 }
 
-function fallbackTTS(text) {
+function fallbackTTS(text, isVietnamese) {
   if ('speechSynthesis' in window) {
     const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'en-US';
-    const voices = window.speechSynthesis.getVoices();
-    const enVoice = voices.find(v => v.name === 'Google US English') || 
-                    voices.find(v => v.name.includes('Natural')) || 
-                    voices.find(v => v.lang === 'en-US');
-    if (enVoice) utter.voice = enVoice;
+    utter.lang = isVietnamese ? 'vi-VN' : 'en-US';
+    
+    if (!isVietnamese) {
+      const voices = window.speechSynthesis.getVoices();
+      const enVoice = voices.find(v => v.name === 'Google US English') || 
+                      voices.find(v => v.name && v.name.includes('Natural')) || 
+                      voices.find(v => v.lang === 'en-US');
+      if (enVoice) utter.voice = enVoice;
+    }
     window.speechSynthesis.speak(utter);
   }
 }
