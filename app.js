@@ -165,6 +165,7 @@ function handleLogout() {
   document.getElementById('loginScreen').classList.add('active');
 }
 
+function showApp() {
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('appScreen').classList.add('active');
   document.getElementById('userBadge').textContent = currentUser.name;
