@@ -387,34 +387,60 @@ async function sendToAI() {
 }
 
 // ===== TTS =====
+let currentAudio = null;
+
 function speakText(text) {
+  // Dừng audio cũ nếu đang phát
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  // Tách câu để lách giới hạn 200 ký tự của Google TTS
+  const chunks = text.match(/[^.?!]+[.?!]+|[^.?!]+$/g) || [text];
+  let currentChunk = 0;
+
+  function playNext() {
+    if (currentChunk >= chunks.length) return;
+    const chunk = chunks[currentChunk].trim();
+    if (!chunk) {
+      currentChunk++;
+      playNext();
+      return;
+    }
+
+    const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=en&client=tw-ob`;
+    currentAudio = new Audio(url);
+    currentAudio.playbackRate = 1.0;
+    
+    currentAudio.onended = () => {
+      currentChunk++;
+      playNext();
+    };
+    
+    currentAudio.onerror = () => {
+      // Fallback nếu mạng lỗi: dùng giọng máy tính
+      fallbackTTS(chunks.slice(currentChunk).join(' '));
+    };
+
+    currentAudio.play().catch(e => {
+      fallbackTTS(chunks.slice(currentChunk).join(' '));
+    });
+  }
+
+  playNext();
+}
+
+function fallbackTTS(text) {
   if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'en-US';
-    utter.rate = 0.9;
-    utter.pitch = 1;
-    
-    // Try to get a high-quality natural voice
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoices = [
-      'Google US English', // Natural voice on Chrome
-      'Microsoft Aria Online (Natural) - English (United States)', // Natural Edge voice
-      'Google UK English Female', // Natural UK voice
-      'Samantha' // Mac offline fallback
-    ];
-
-    let enVoice = null;
-    for (let name of preferredVoices) {
-      enVoice = voices.find(v => v.name === name);
-      if (enVoice) break;
-    }
-    
-    if (!enVoice) {
-      enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
-    }
+    const enVoice = voices.find(v => v.name === 'Google US English') || 
+                    voices.find(v => v.name.includes('Natural')) || 
+                    voices.find(v => v.lang === 'en-US');
     if (enVoice) utter.voice = enVoice;
-    
     window.speechSynthesis.speak(utter);
   }
 }
