@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192', // Siêu nhanh, rất hợp để đóng vai Coach giao tiếp
+        model: 'llama-3.3-70b-versatile', // Cập nhật sang model Llama 3.3 mới nhất của Groq
         messages: messages,
         temperature: 0.7,
         max_tokens: 300
