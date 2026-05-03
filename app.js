@@ -284,8 +284,6 @@ function initSpeechRecognition() {
 let audioUnlocked = false;
 function unlockAudio() {
   if (audioUnlocked) return;
-  currentAudio.src = 'data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
-  currentAudio.play().catch(()=>{});
   if ('speechSynthesis' in window) {
     const utter = new SpeechSynthesisUtterance('');
     utter.volume = 0;
@@ -404,81 +402,44 @@ async function sendToAI() {
 }
 
 // ===== TTS =====
-let currentAudio = new Audio();
-
 function speakText(text) {
-  // Dừng audio cũ nếu đang phát
-  currentAudio.pause();
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
 
-  // Tách câu để lách giới hạn 200 ký tự của Google TTS
-  // Tách theo dấu chấm, chấm hỏi, chấm than, hoặc xuống dòng
-  const chunks = text.match(/[^.?!\\n]+[.?!\\n]+|[^.?!\\n]+$/g) || [text];
-  let currentChunk = 0;
-
-  function playNext() {
-    if (currentChunk >= chunks.length) return;
-    let chunk = chunks[currentChunk].trim();
-    if (!chunk) {
-      currentChunk++;
-      playNext();
-      return;
+  // Phát hiện tiếng Việt
+  const isVietnamese = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(text);
+  
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.95;
+  utter.pitch = 1;
+  utter.lang = isVietnamese ? 'vi-VN' : 'en-US';
+  
+  const voices = window.speechSynthesis.getVoices();
+  
+  if (isVietnamese) {
+    const viVoice = voices.find(v => v.lang.startsWith('vi'));
+    if (viVoice) utter.voice = viVoice;
+  } else {
+    // Ưu tiên các giọng tự nhiên cho tiếng Anh
+    const preferredVoices = [
+      'Google US English', 
+      'Microsoft Aria Online (Natural) - English (United States)',
+      'Google UK English Female',
+      'Alex', // Giọng khá tốt trên Mac
+      'Samantha'
+    ];
+    let enVoice = null;
+    for (let name of preferredVoices) {
+      enVoice = voices.find(v => v.name === name);
+      if (enVoice) break;
     }
-
-    // Nếu chunk quá dài (> 150 ký tự), cắt bớt để không bị lỗi 400 Bad Request
-    if (chunk.length > 150) {
-      chunk = chunk.substring(0, 150);
+    if (!enVoice) {
+      enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
     }
-
-    // Phát hiện tiếng Việt
-    const isVietnamese = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(chunk);
-    const langCode = isVietnamese ? 'vi' : 'en';
-
-    const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${langCode}&client=tw-ob`;
-    currentAudio.src = url;
-    currentAudio.playbackRate = 1.0;
-    
-    currentAudio.onended = () => {
-      currentChunk++;
-      playNext();
-    };
-    
-    currentAudio.onerror = () => {
-      // Fallback nếu mạng lỗi
-      fallbackTTS(chunk, isVietnamese);
-      // Giả lập onended để chạy tiếp câu sau
-      setTimeout(() => {
-        currentChunk++;
-        playNext();
-      }, 2000);
-    };
-
-    currentAudio.play().catch(e => {
-      fallbackTTS(chunk, isVietnamese);
-      setTimeout(() => {
-        currentChunk++;
-        playNext();
-      }, 2000);
-    });
+    if (enVoice) utter.voice = enVoice;
   }
-
-  playNext();
-}
-
-function fallbackTTS(text, isVietnamese) {
-  if ('speechSynthesis' in window) {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = isVietnamese ? 'vi-VN' : 'en-US';
-    
-    if (!isVietnamese) {
-      const voices = window.speechSynthesis.getVoices();
-      const enVoice = voices.find(v => v.name === 'Google US English') || 
-                      voices.find(v => v.name && v.name.includes('Natural')) || 
-                      voices.find(v => v.lang === 'en-US');
-      if (enVoice) utter.voice = enVoice;
-    }
-    window.speechSynthesis.speak(utter);
-  }
+  
+  window.speechSynthesis.speak(utter);
 }
 
 function replayMessage(text) {
