@@ -244,20 +244,21 @@ function initSpeechRecognition() {
   recognition.continuous = true;
   recognition.interimResults = true;
 
-  let finalTranscript = '';
+  let currentTranscript = '';
 
   recognition.onresult = (event) => {
+    let finalT = '';
     let interim = '';
-    finalTranscript = '';
     for (let i = 0; i < event.results.length; i++) {
       const t = event.results[i][0].transcript;
       if (event.results[i].isFinal) {
-        finalTranscript += t;
+        finalT += t;
       } else {
         interim += t;
       }
     }
-    document.getElementById('transcriptPreview').textContent = finalTranscript || interim || '...';
+    currentTranscript = finalT + interim;
+    document.getElementById('transcriptPreview').textContent = currentTranscript || '...';
   };
 
   recognition.onerror = (e) => {
@@ -269,13 +270,11 @@ function initSpeechRecognition() {
   };
 
   recognition.onend = () => {
-    if (isListening) {
-      // It auto-stopped, send what we have
-      if (finalTranscript.trim()) {
-        processUserSpeech(finalTranscript.trim());
-      }
-      stopListeningUI();
+    if (currentTranscript.trim()) {
+      processUserSpeech(currentTranscript.trim());
+      currentTranscript = '';
     }
+    stopListeningUI();
   };
 }
 
@@ -293,9 +292,8 @@ function startListening() {
 
 function stopListening() {
   if (!recognition || !isListening) return;
-  isListening = false;
+  // Let onend handle the state changes and sending
   try { recognition.stop(); } catch(e) { /* already stopped */ }
-  stopListeningUI();
 }
 
 function stopListeningUI() {
@@ -397,11 +395,24 @@ function speakText(text) {
     utter.rate = 0.9;
     utter.pitch = 1;
     
-    // Try to get a good English voice
+    // Try to get a high-quality natural voice
     const voices = window.speechSynthesis.getVoices();
-    const enVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Samantha'))
-      || voices.find(v => v.lang.startsWith('en-US'))
-      || voices.find(v => v.lang.startsWith('en'));
+    const preferredVoices = [
+      'Google US English', // Natural voice on Chrome
+      'Microsoft Aria Online (Natural) - English (United States)', // Natural Edge voice
+      'Google UK English Female', // Natural UK voice
+      'Samantha' // Mac offline fallback
+    ];
+
+    let enVoice = null;
+    for (let name of preferredVoices) {
+      enVoice = voices.find(v => v.name === name);
+      if (enVoice) break;
+    }
+    
+    if (!enVoice) {
+      enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
+    }
     if (enVoice) utter.voice = enVoice;
     
     window.speechSynthesis.speak(utter);
