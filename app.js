@@ -21,7 +21,8 @@ const TOPICS = [
 const SYSTEM_PROMPTS = {
   free: `You are a friendly and encouraging English speaking coach for Vietnamese students at ORI Academy.
 Rules:
-- ALWAYS respond in English.
+- Speak English by default.
+- IF the student speaks in Vietnamese, asks for translation, or seems stuck: Briefly explain, translate, or give suggestions in VIETNAMESE, then ask them an easy English question to get them talking again.
 - Keep responses SHORT (2-3 sentences max) to maintain conversational flow.
 - After responding, ask a follow-up question to keep the conversation going.
 - If the student makes a grammar or vocabulary mistake, gently correct it in your response.
@@ -30,7 +31,8 @@ Rules:
 
   topic: `You are a friendly English speaking coach at ORI Academy. 
 Rules:
-- ALWAYS respond in English.
+- Speak English by default.
+- IF the student speaks in Vietnamese, asks for translation, or seems stuck: Briefly explain, translate, or give suggestions in VIETNAMESE, then guide them back to the English topic.
 - Keep responses SHORT (2-3 sentences max).
 - Stay focused on the given topic.
 - After responding, ask a follow-up question related to the topic.
@@ -39,7 +41,8 @@ Rules:
 
   reflex: `You are a fast-paced English speaking drill coach at ORI Academy.
 Rules:
-- ALWAYS respond in English.
+- Speak English by default.
+- IF the student speaks in Vietnamese: Briefly explain in Vietnamese and immediately ask the next English reflex question.
 - Ask ONE short, direct question that requires a quick response.
 - Questions should be simple daily life scenarios.
 - After the student responds, briefly acknowledge, then immediately ask the NEXT question.
@@ -278,7 +281,21 @@ function initSpeechRecognition() {
   };
 }
 
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return;
+  const silent = new Audio('data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq');
+  silent.play().catch(()=>{});
+  if ('speechSynthesis' in window) {
+    const utter = new SpeechSynthesisUtterance('');
+    utter.volume = 0;
+    window.speechSynthesis.speak(utter);
+  }
+  audioUnlocked = true;
+}
+
 function startListening() {
+  unlockAudio();
   if (!recognition) {
     showToast('⚠️ Trình duyệt không hỗ trợ. Dùng Chrome!', 'error');
     return;
@@ -429,6 +446,7 @@ function speakText(text) {
     });
   }
 
+  // Pre-fetch iframe check if blocked by CORS?
   playNext();
 }
 
