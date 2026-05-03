@@ -66,15 +66,11 @@ let currentTopic = null;
 let chatHistory = [];
 let recognition = null;
 let isListening = false;
-let apiKey = '';
 let reflexTimer = null;
 let reflexSeconds = 10;
 let studentList = []; // Danh sách học viên từ Google Sheet
 
-// ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
-  apiKey = localStorage.getItem('ori_gemini_key') || DEFAULT_API_KEY;
-  
   // Fetch student list from Google Sheet
   fetchStudents();
 
@@ -169,31 +165,9 @@ function handleLogout() {
   document.getElementById('loginScreen').classList.add('active');
 }
 
-function showApp() {
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('appScreen').classList.add('active');
   document.getElementById('userBadge').textContent = currentUser.name;
-
-  if (!apiKey) {
-    showToast('⚠️ Chưa có API Key. Bấm ⚙️ để cài đặt.', 'error');
-  }
-}
-
-// ===== SETTINGS =====
-function toggleSettings() {
-  const panel = document.getElementById('settingsPanel');
-  const shown = panel.style.display !== 'none';
-  panel.style.display = shown ? 'none' : 'block';
-  if (!shown) {
-    document.getElementById('apiKeyInput').value = apiKey;
-  }
-}
-
-function saveApiKey() {
-  apiKey = document.getElementById('apiKeyInput').value.trim();
-  localStorage.setItem('ori_gemini_key', apiKey);
-  document.getElementById('settingsPanel').style.display = 'none';
-  showToast(apiKey ? '✅ API Key đã lưu!' : '⚠️ Key trống — AI sẽ không hoạt động.');
 }
 
 // ===== MODE SELECTION =====
@@ -211,11 +185,6 @@ function renderTopics() {
 
 // ===== SESSION =====
 function startSession(mode, topicId) {
-  if (!apiKey) {
-    showToast('⚠️ Cần nhập Gemini API Key trước! Bấm ⚙️', 'error');
-    return;
-  }
-
   currentMode = mode;
   chatHistory = [];
 
@@ -245,9 +214,10 @@ function startSession(mode, topicId) {
     systemPrompt += `\nCurrent topic: ${currentTopic.label}. ${currentTopic.prompt}`;
   }
 
-  chatHistory.push({ role: 'user', parts: [{ text: `[System: ${systemPrompt}]\n\nThe student "${currentUser.name}" just joined. Start the conversation with a warm greeting and your first question.` }] });
+  chatHistory.push({ role: 'system', content: systemPrompt });
+  chatHistory.push({ role: 'user', content: `The student "${currentUser.name}" just joined. Start the conversation with a warm greeting and your first question.` });
 
-  sendToGemini();
+  sendToAI();
 }
 
 function endSession() {
@@ -342,8 +312,8 @@ function processUserSpeech(text) {
   addMessage('user', text);
   document.getElementById('transcriptPreview').textContent = '';
   
-  chatHistory.push({ role: 'user', parts: [{ text }] });
-  sendToGemini();
+  chatHistory.push({ role: 'user', content: text });
+  sendToAI();
 }
 
 // ===== TEXT INPUT =====
@@ -362,31 +332,16 @@ function sendTextMessage() {
   processUserSpeech(text);
 }
 
-// ===== GEMINI API =====
-async function sendToGemini() {
-  if (!apiKey) {
-    showToast('⚠️ API Key chưa được cài đặt!', 'error');
-    return;
-  }
-
+// ===== AI BACKEND =====
+async function sendToAI() {
   // Show loading
   const loadingId = addMessage('ai', '💭 Đang suy nghĩ...', true);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    
-    const body = {
-      contents: chatHistory,
-      generationConfig: {
-        temperature: 0.8,
-        maxOutputTokens: 300,
-      }
-    };
-
-    const res = await fetch(url, {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ messages: chatHistory })
     });
 
     const data = await res.json();
@@ -395,13 +350,13 @@ async function sendToGemini() {
     removeMessage(loadingId);
 
     if (data.error) {
-      addMessage('ai', '⚠️ Lỗi API: ' + data.error.message);
+      addMessage('ai', '⚠️ Lỗi: ' + data.error);
       return;
     }
 
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+    const aiText = data.text || 'Sorry, I could not generate a response.';
     
-    chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
+    chatHistory.push({ role: 'assistant', content: aiText });
 
     // Parse feedback if present
     const feedbackMatch = aiText.match(/\[FEEDBACK\](.*?)\[\/FEEDBACK\]/s);
@@ -427,7 +382,7 @@ async function sendToGemini() {
 
   } catch (err) {
     removeMessage(loadingId);
-    addMessage('ai', '❌ Lỗi kết nối: ' + err.message);
+    addMessage('ai', '❌ Lỗi kết nối máy chủ: ' + err.message);
     console.error(err);
   }
 }
@@ -473,8 +428,8 @@ function startReflexTimer() {
       reflexTimer = null;
       // Time's up!
       addMessage('user', '(⏰ Hết giờ — không trả lời kịp)');
-      chatHistory.push({ role: 'user', parts: [{ text: "(The student ran out of time and didn't answer. Encourage them and ask the next question.)" }] });
-      sendToGemini();
+      chatHistory.push({ role: 'user', content: "(The student ran out of time and didn't answer. Encourage them and ask the next question.)" });
+      sendToAI();
     }
   }, 1000);
 }
